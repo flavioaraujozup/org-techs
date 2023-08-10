@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html>
+   <head>
+      <title>Inventário de Repositórios e Tecnologias da Org</title>
+      <script
+         src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+      <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+      <link rel="preconnect" href="https://fonts.googleapis.com">
+      <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+      <link
+         href="https://fonts.googleapis.com/css2?family=Comfortaa:wght@300;400&family=Roboto:ital,wght@0,100;0,300;0,400;1,100;1,300;1,400&family=Ubuntu:wght@300&display=swap"
+         rel="stylesheet">
+      <style>
+         body{
+         margin: 20px;
+         font-family: 'Roboto';
+         background-color: #f4f4f4;         
+         }
+         .container {
+         display: flex;
+         background-color: #fff;
+         padding: 20px;
+         border-radius: 5px;
+         box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+         }
+         .title {
+         width: 100%;
+         background-color: #34495E;
+         margin-bottom: 20px;
+         border-radius: 5px;
+         }
+         .title h1{padding: 32px;
+            top: 50%;
+            left: 50%;
+            color: #fff;
+        }
+        .title p{
+            padding: 16px;
+            color: #fff;
+            margin-left: 30px;
+        }        
+         .left-div, .right-div {
+         padding: 20px;
+         background-color: lightblue; /* Just for visualization */  
+         border-radius: 5px;
+         margin: 0 1px;  
+         }
+         .left-div {
+         flex: 40%; /* 30% of the container */
+         padding: 30px;
+         }
+         .right-div {
+         flex: 60%; /* 70% of the container */
+         padding: 30px;
+         }
+         input[type=text], select {
+         width: 100%;
+         padding: 12px 20px;
+         margin: 8px 0;
+         display: inline-block;
+         border: 1px solid #ccc;
+         border-radius: 4px;
+         box-sizing: border-box;
+         font-size: 16px;
+         }
+         /* Estilo dos botões */
+         button {
+            width: 100%;
+            height: 42px;
+         background-color: #3498DB;
+         color: #fff;
+         border: none;
+         padding: 10px 15px;
+         border-radius: 5px;
+         cursor: pointer;
+         transition: background-color 0.3s;
+         font-size: 20px;
+         }
+         button:hover {
+         background-color: #2980B9;
+         }
+         #languages {
+         display: none;  /* Oculta a tabela por padrão */
+         }
+         .loading-icon {
+         display: none;
+         position: fixed;
+         top: 50%;
+         left: 50%;
+         transform: translate(-50%, -50%); /* Centraliza o ícone na tela */
+         z-index: 1000; /* Coloca o ícone na frente de outros elementos */
+         background-color: #f0f0f0;
+         opacity : 0.8;
+         font-size: 32px;
+         width: 100%;
+         height: 100%;
+         }
+         .loading-icon p{
+         position: fixed;
+         top: 50%;
+         left: 50%;
+         }
+         /* Estilo da tabela */
+         table {
+         width: 100%;
+         border-collapse: collapse;
+         background-color: #fff;
+         box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+         border-radius: 5px;
+         }
+         th, td {
+         padding: 10px 15px;
+         text-align: left;
+         border-bottom: 1px solid #ddd;
+         }
+         th {
+         background-color: #2C3E50;
+         color: #fff;
+         font-weight: bold;
+         }
+         tr:hover {
+         background-color: #f5f5f5;
+         }
+      </style>
+   </head>
+   <body>
+      <div class="loading-icon">
+         <p>Loading ...</p>
+      </div>
+      <div class="title">
+         <h1>Inventário de Repositórios e Tecnologias da Org</h1>
+         <p>Você precisará criar uma chave/token no Github para listar as tecnologias da organização. Caso contrário, irá ter acesso somente aos repositórios públicos.</p>
+
+         <p>Para criar sua chave vá em: Perfil > Settings > Developer Settings >  Personal Access Tokens > Tokens (classic) > Generate new token. Em "select scope", marque as opçoes de "admin:org > read:org"</p>
+
+         <p>Observação: se a Org utiliza autenticação de dois fatores, você precisa associar esse token a essa org neste mesmo local, senao tomará Erro HTTP 403.</p>
+      </div>
+      <div class="container">
+         <div class="left-div">
+            <label for="organization">Organization: </label>
+            <input type="text" id="organization" value="" />
+            <label for="access_token">Access Token:</label>
+            <input type="text" id="access_token"
+               placeholder="YOUR_ACCESS_TOKEN"
+               value="" />
+            <button onclick="getOrganizationRepos()">Buscar Dados</button>
+            <p id="repo-count"></p>
+            <table id="languages">
+               <thead>
+                  <tr>
+                     <th>#</th>
+                     <th>Language</th>
+                     <th>Count</th>
+                  </tr>
+               </thead>
+               <tbody></tbody>
+            </table>
+         </div>
+         <div id="chart" class="right-div"></div>
+         <script>
+            var accessToken = null;
+            var chart = null;
+            
+            async function getOrganizationRepos() {
+                    // Show loading icon
+                    $(".loading-icon").show();
+                    // Reset the table, the chart, and the repo count message
+                    $("#languages tbody").empty();
+                    $("#languages").hide();  // Oculta a tabela quando começar a busca
+                    if (chart) {
+                        chart.destroy();
+                    }
+                    $("#repo-count").text(""); // Reset the repo count message
+                var organization = $("#organization").val();
+                accessToken = $("#access_token").val();
+                var url = "https://api.github.com/orgs/" + organization + "/repos";
+                var languages = {};
+                await fetchRepos(url, languages, 1, 0);  
+                // Hide loading icon when all is done
+                $(".loading-icon").hide();    
+                $("#languages").show();  // Exibe a tabela quando a busca estiver concluída
+            }
+            
+            async function fetchRepos(url, languages, page, repoCount) {
+                const response = await $.ajax({
+                    url: url + "?page=" + page,
+                    headers: {
+                        "Authorization": "token " + accessToken
+                    }
+                });
+            
+                if (response.length === 0) {
+                    listLanguages(languages);
+                    $("#repo-count").text("Quantidade de repositórios encontrados: " + repoCount);
+                    return;
+                }
+            
+                let promises = [];
+                response.forEach(repo => {
+                    promises.push(getRepoLanguages(repo.languages_url, languages));
+                    $(".loading-icon p").fadeOut("slow");
+                    $(".loading-icon p").fadeIn("slow");          
+                });
+            
+                await Promise.all(promises);
+                await fetchRepos(url, languages, page + 1, repoCount + response.length);
+            }
+            
+            async function getRepoLanguages(url, languages) {
+                const response = await $.ajax({
+                    url: url,
+                    headers: {
+                        "Authorization": "token " + accessToken
+                    }
+                });
+            
+                for (let language in response) {
+                    if (languages[language]) {
+                        languages[language]++;
+                    } else {
+                        languages[language] = 1;
+                    }
+                }
+            }
+            
+            function listLanguages(languages) {
+                var sortedLanguages = Object.entries(languages).sort((a, b) => b[1] - a[1]);
+                var tbody = $("#languages tbody");
+                tbody.empty();
+            
+                var categories = [];
+                var seriesData = [];
+            
+                sortedLanguages.forEach(([language, count], index) => {
+                    tbody.append($("<tr>").append($("<td>").text(index + 1)).append($("<td>").text(language)).append($("<td>").text(count)));
+                    
+                    if (index < 20) {
+                        categories.push(language);
+                        seriesData.push(count);
+                    }
+                });
+            
+                var options = {
+                    chart: {
+                        type: 'bar',
+                        toolbar: {
+                            show: true,
+                            offsetX: 0,
+                            offsetY: 0,                
+                            tools: {
+                                download: true,
+                                selection: true,
+                                zoom: true,
+                                zoomin: true,
+                                zoomout: true,
+                                pan: true,
+                                reset: true
+                            },
+                            export: {
+                                csv: {
+                                    filename: "chart_data",
+                                },
+                                svg: {
+                                    filename: "chart_export",
+                                },
+                                png: {
+                                    filename: "chart_export",
+                                }
+                            },
+                            autoSelected: 'zoom'
+                        },
+                        
+                        animations: {
+                            enabled: true
+                        }
+                    },
+            
+                    plotOptions: {
+                      bar: {
+                        borderRadius: 10,
+                        dataLabels: {
+                          position: 'top', // top, center, bottom
+                        },
+                      }
+                    },        
+                    
+                    series: [{
+                        name: 'Repositories',
+                        data: seriesData
+                    }],
+                    xaxis: {
+                        categories: categories
+                    },
+                    title: {
+                        text: 'Top 20 Linguagens',
+                        style: {
+                        fontSize:  '24px',
+                        fontWeight:  'light',
+                        fontFamily:  'Roboto',
+                        color:  '#263238'
+                        },
+                    },
+                };
+                chart = new ApexCharts(document.querySelector("#chart"), options);
+                chart.render();
+            }
+         </script>
+      </div>
+   </body>
+</html>
