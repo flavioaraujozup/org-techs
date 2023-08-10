@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
    <head>
-      <title>Inventário de Repositórios e Tecnologias da Org</title>
+      <title>Inventário de Tecnologias da Org</title>
       <script
          src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
       <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
@@ -128,7 +128,7 @@
          <p>Loading ...</p>
       </div>
       <div class="title">
-         <h1>Inventário de Repositórios e Tecnologias da Org</h1>
+         <h1>Inventário de Tecnologias da Org no Github</h1>
          <p>Você precisará criar uma chave/token no Github para listar as tecnologias da organização. Caso contrário, irá ter acesso somente aos repositórios públicos.</p>
 
          <p>Para criar sua chave vá em: Perfil > Settings > Developer Settings >  Personal Access Tokens > Tokens (classic) > Generate new token. Em "select scope", marque as opçoes de "admin:org > read:org"</p>
@@ -158,28 +158,30 @@
          </div>
          <div id="chart" class="right-div"></div>
          <script>
-            var accessToken = null;
-            var chart = null;
-            
-            async function getOrganizationRepos() {
-                    // Show loading icon
-                    $(".loading-icon").show();
-                    // Reset the table, the chart, and the repo count message
-                    $("#languages tbody").empty();
-                    $("#languages").hide();  // Oculta a tabela quando começar a busca
-                    if (chart) {
-                        chart.destroy();
-                    }
-                    $("#repo-count").text(""); // Reset the repo count message
-                var organization = $("#organization").val();
-                accessToken = $("#access_token").val();
-                var url = "https://api.github.com/orgs/" + organization + "/repos";
-                var languages = {};
-                await fetchRepos(url, languages, 1, 0);  
-                // Hide loading icon when all is done
-                $(".loading-icon").hide();    
-                $("#languages").show();  // Exibe a tabela quando a busca estiver concluída
+        var accessToken = null;
+        var chart = null;
+
+        async function getOrganizationRepos() {
+            // Mostra o ícone de carregamento
+            $(".loading-icon").show();
+            // Reseta a tabela, o gráfico e a mensagem de contagem de repositórios
+            $("#languages tbody").empty();
+            $("#languages").hide();
+            if (chart) {
+                chart.destroy();
             }
+            $("#repo-count").text("");
+
+            var organization = $("#organization").val();
+            accessToken = $("#access_token").val();
+            var url = "https://api.github.com/orgs/" + organization + "/repos";
+            var languages = {};
+            await fetchRepos(url, languages, 1, 0);
+
+            // Esconde o ícone de carregamento quando tudo estiver pronto
+            $(".loading-icon").hide();
+            $("#languages").show();
+        }
             
             async function fetchRepos(url, languages, page, repoCount) {
                 const response = await $.ajax({
@@ -223,76 +225,110 @@
                 }
             }
             
-            function listLanguages(languages) {
-                var sortedLanguages = Object.entries(languages).sort((a, b) => b[1] - a[1]);
-                var tbody = $("#languages tbody");
-                tbody.empty();
-            
-                var categories = [];
-                var seriesData = [];
-            
-                sortedLanguages.forEach(([language, count], index) => {
-                    tbody.append($("<tr>").append($("<td>").text(index + 1)).append($("<td>").text(language)).append($("<td>").text(count)));
-                    
-                    if (index < 20) {
-                        categories.push(language);
-                        seriesData.push(count);
-                    }
-                });
-            
-                var options = {
-                    chart: {
-                        type: 'bar',
-                        toolbar: {
-                            show: true,
-                            offsetX: 0,
-                            offsetY: 0,                
-                            tools: {
-                                download: true,
-                                selection: true,
-                                zoom: true,
-                                zoomin: true,
-                                zoomout: true,
-                                pan: true,
-                                reset: true
-                            },
-                            export: {
-                                csv: {
-                                    filename: "chart_data",
-                                },
-                                svg: {
-                                    filename: "chart_export",
-                                },
-                                png: {
-                                    filename: "chart_export",
-                                }
-                            },
-                            autoSelected: 'zoom'
-                        },
-                        
-                        animations: {
-                            enabled: true
-                        }
+        function listLanguages(languages) {
+            var sortedLanguages = Object.entries(languages).sort((a, b) => b[1] - a[1]);
+            var tbody = $("#languages tbody");
+            tbody.empty();
+
+            var categories = [];
+            var seriesData = [];
+            var paretoData = [];
+            var accumulatedCount = 0;
+            var totalCount = sortedLanguages.reduce((acc, curr) => acc + curr[1], 0);
+
+            sortedLanguages.forEach(([language, count], index) => {
+                tbody.append($("<tr>").append($("<td>").text(index + 1)).append($("<td>").text(language)).append($("<td>").text(Math.round(count))));
+
+                categories.push(language);
+                seriesData.push(Math.round(count));
+                accumulatedCount += count;
+                paretoData.push(Math.round((accumulatedCount / totalCount) * 100));
+            });
+
+            var options = {
+                plotOptions: {
+                  bar: {
+                    borderRadius: 10,
+                    dataLabels: {
+                      position: 'bottom', // top, center, bottom
                     },
-            
-                    plotOptions: {
-                      bar: {
-                        borderRadius: 10,
-                        dataLabels: {
-                          position: 'top', // top, center, bottom
-                        },
-                      }
-                    },        
-                    
-                    series: [{
-                        name: 'Repositories',
-                        data: seriesData
-                    }],
+                  }
+                },
+                legend: {
+                      show: true,
+                      position: 'bottom',
+                      horizontalAlign: 'center', 
+                      floating: false,
+                      fontSize: '16px',
+                      fontFamily: 'Helvetica, Arial',
+                      fontWeight: 400,
+                      customLegendItems: [],
+                      offsetX: 0,
+                      offsetY: 0,
+                      labels: {
+                          colors: ['#008ffb', '#df6825'], //
+                          useSeriesColors: false
+                      },
+                      markers: {
+                          width: 12,
+                          height: 12,
+                          strokeWidth: 0,
+                          strokeColor: '#fff',
+                          fillColors: ['#008ffb', '#df6825'],
+                          radius: 12,
+                      },                      
+                    },                
+                chart: {
+                    type: 'line',
+                    stacked: false,
+                    height: 350,
+                    toolbar: {
+                        show: true,
+                        tools: {
+                            download: true,
+                            selection: true,
+                            zoom: true,
+                            zoomin: true,
+                            zoomout: true,
+                            pan: true,
+                            reset: true
+                        }
+                    }
+                },
+                dataLabels: {
+                    enabled: true,
+                    position: 'top',
+                    background: {
+                        enabled: true,
+                        foreColor: '#fff', //altera a cor do texto dos numeros do label     
+                         borderRadius: 2,
+                         padding: 4,
+                         borderWidth: 0,
+                         padding: 4
+                    },
+                    style: {
+                        colors: ['#008ffb', '#df6825'] //altera o background dos numeros da linha e das barras
+                    },                    
+                },
+                stroke: {
+                    width: [0, 2],
+                    colors: ['#df6825'], //altera a cor da linha do pareto            
+                    curve: 'smooth'
+                },
+                series: [{
+                    name: 'Contagem de Linguagens',
+                    type: 'column',
+                    data: seriesData
+                }, {
+                    name: 'Pareto',
+                    type: 'line',
+                    data: paretoData
+                }],
                     xaxis: {
-                        categories: categories
+                        categories: categories,
                     },
                     title: {
-                        text: 'Top 20 Linguagens',
+                        text: 'Linguagens de Programação',
                         style: {
                         fontSize:  '24px',
                         fontWeight:  'light',
@@ -300,10 +336,23 @@
                         color:  '#263238'
                         },
                     },
-                };
-                chart = new ApexCharts(document.querySelector("#chart"), options);
-                chart.render();
-            }
+
+                yaxis: [{
+                    title: {
+                        text: 'Contagem de Linguagens',
+                    },
+                }, {
+                    opposite: true,
+                    title: {
+                        text: 'Pareto (%)'
+                    },
+                    min: 0,
+                    max: 100
+                }]
+            };
+            chart = new ApexCharts(document.querySelector("#chart"), options);
+            chart.render();
+        }
          </script>
       </div>
    </body>
